@@ -1,31 +1,68 @@
 <!doctype html>
-<html lang="ru">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Список документов</title>
-<style>
-:root{font-family:system-ui,-apple-system,'Segoe UI',Arial,sans-serif;color:#1d2939;background:#f5f7fb}*{box-sizing:border-box}body{margin:0;padding:32px 18px}.wrap{max-width:1100px;margin:auto}h1{font-size:28px;margin:0 0 8px}.sub{color:#667085;margin:0 0 26px}.layout{display:grid;grid-template-columns:1fr 1fr;gap:20px}.panel{background:#fff;border:1px solid #e5eaf0;border-radius:16px;padding:24px;box-shadow:0 4px 20px #1d293908}h2{font-size:18px;margin:0 0 18px}.add{display:flex;gap:8px;margin-bottom:18px}input[type=text]{flex:1;min-width:0;border:1px solid #cbd5e1;border-radius:9px;padding:12px;font:inherit}button{border:0;border-radius:9px;padding:11px 15px;font:inherit;cursor:pointer;background:#2563eb;color:white}button:hover{filter:brightness(.94)}button:focus-visible,input:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}.doc{display:flex;align-items:center;gap:12px;border-bottom:1px solid #eef2f6;padding:12px 0}.doc:last-child{border-bottom:0}.doc label{display:flex;align-items:center;gap:12px;flex:1;min-width:0;overflow-wrap:anywhere;cursor:pointer}.doc input{width:19px;height:19px;accent-color:#2563eb;flex:none}.delete{background:#fff1f2;color:#be123c;padding:7px 11px;flex:none}.result{white-space:pre-wrap;overflow-wrap:anywhere;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;min-height:130px;padding:16px;line-height:1.6}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.secondary{background:#e9eef7;color:#344054}.hint{color:#667085;font-size:13px;margin:14px 0 0}.empty{color:#98a2b3;font-size:14px}.count{font-size:13px;color:#667085;margin:-10px 0 12px}@media(max-width:720px){.layout{grid-template-columns:1fr}body{padding:20px 12px}.panel{padding:18px}}
-</style>
-</head>
-<body><main class="wrap"><h1>Список документов</h1><p class="sub">Отмечайте документы — итоговый текст сформируется автоматически.</p><p id="storageWarning" role="alert" style="display:none;background:#fff1f2;color:#9f1239;padding:12px;border-radius:9px;margin:0 0 18px"></p><div class="layout"><section class="panel"><h2>Документы</h2><form class="add" id="addForm"><input id="newDoc" type="text" placeholder="Название нового документа" maxlength="200" aria-label="Название документа" required><button type="submit">Добавить</button></form><div id="count" class="count"></div><div id="docs"></div></section><section class="panel"><h2>Итоговое сообщение</h2><div id="result" class="result" aria-live="polite"></div><div class="actions"><button id="copy" type="button">Скопировать текст</button><button id="clear" class="secondary" type="button">Снять все галочки</button></div><p class="hint">Список и галочки сохраняются в этом браузере на данном компьютере. Дата обновляется при открытии страницы и при возвращении на вкладку.</p></section></div></main>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Список документов</title>
+<style>body{font:16px system-ui,Arial;background:#f4f6fa;color:#202b3c;margin:0;padding:28px}main{max-width:1050px;margin:auto}h1{font-size:26px}.layout{display:grid;grid-template-columns:1fr 1fr;gap:18px}.panel{background:white;border-radius:14px;padding:24px;box-shadow:0 2px 14px #0001}.add{display:flex;gap:8px}input[type=text]{padding:11px;min-width:0;flex:1;border:1px solid #ccd3de;border-radius:8px;font:inherit}button{background:#2464d8;color:white;border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font:inherit}.doc{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #eee}.doc label{display:flex;gap:10px;align-items:center;flex:1;overflow-wrap:anywhere}.doc input{width:19px;height:19px}.delete{background:#fff0f1;color:#a22;padding:7px 10px}.result{background:#f6f8fb;border:1px solid #e3e7ee;border-radius:9px;padding:16px;min-height:90px;overflow-wrap:anywhere}.muted{color:#697586;font-size:14px}.warning{color:#9c1525;background:#fff0f1;padding:12px;border-radius:8px;margin:12px 0}#copy{margin-top:14px}@media(max-width:700px){.layout{grid-template-columns:1fr}body{padding:14px}.panel{padding:17px}}</style></head>
+<body><main><h1>Список документов</h1><p class="muted">Отмечайте документы — итоговый текст формируется автоматически.</p><p id="warning" class="warning" hidden></p><div class="layout"><section class="panel"><h2>Документы</h2><form id="form" class="add"><input id="name" type="text" maxlength="200" required placeholder="Название документа"><button>Добавить</button></form><p id="count" class="muted"></p><div id="docs"></div></section><section class="panel"><h2>Итоговое сообщение</h2><div id="result" class="result"></div><button id="copy" type="button">Скопировать текст</button></section></div></main>
 <script>
-(()=>{'use strict';
-const KEY='local-document-checklist-v1';
-const initial=[];
-const warning=document.getElementById('storageWarning');
-function storageError(){warning.style.display='block';warning.textContent='Браузер не разрешает сохранять данные для этой страницы. Откройте страницу по адресу GitHub Pages (https://), в обычном режиме браузера, и разрешите хранение данных сайта.';}
-try{const probe='__doc_storage_test__';localStorage.setItem(probe,'1');if(localStorage.getItem(probe)!=='1')throw Error('Storage blocked');localStorage.removeItem(probe);}catch(e){storageError();}
-let items=[];
-try{const saved=JSON.parse(localStorage.getItem(KEY));items=Array.isArray(saved)?saved.filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string'&&typeof x.checked==='boolean'):initial;}catch(e){items=initial;storageError();}
-const docs=document.getElementById('docs'),result=document.getElementById('result'),count=document.getElementById('count'),input=document.getElementById('newDoc'),copy=document.getElementById('copy');
-function save(){try{localStorage.setItem(KEY,JSON.stringify(items));}catch(e){console.warn('Не удалось сохранить данные:',e);storageError();}}
-function date(){const d=new Date();return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');}
-function message(){const selected=items.filter(x=>x.checked).map(x=>x.name);return date()+' / нет'+(selected.length?' '+selected.join(', '):'');}
-function update(){result.textContent=message();count.textContent='Всего: '+items.length+' · Отмечено: '+items.filter(x=>x.checked).length;}
-function render(){docs.replaceChildren();if(!items.length){const p=document.createElement('p');p.className='empty';p.textContent='Пока нет документов. Добавьте первый выше.';docs.append(p);}items.forEach(item=>{const row=document.createElement('div');row.className='doc';const label=document.createElement('label');const check=document.createElement('input');check.type='checkbox';check.checked=item.checked;check.addEventListener('change',()=>{item.checked=check.checked;save();update();});const name=document.createElement('span');name.textContent=item.name;label.append(check,name);const del=document.createElement('button');del.type='button';del.className='delete';del.textContent='Удалить';del.setAttribute('aria-label','Удалить '+item.name);del.addEventListener('click',()=>{items=items.filter(x=>x.id!==item.id);save();render();});row.append(label,del);docs.append(row);});update();}
-document.getElementById('addForm').addEventListener('submit',e=>{e.preventDefault();const name=input.value.trim();if(!name)return;items.push({id:(typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function')?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(36).slice(2),name,checked:false});input.value='';save();render();input.focus();});
-document.getElementById('clear').addEventListener('click',()=>{items.forEach(x=>x.checked=false);save();render();});
-copy.addEventListener('click',async()=>{const value=message();try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(value);}else{const field=document.createElement('textarea');field.value=value;field.style.position='fixed';field.style.opacity='0';document.body.append(field);field.select();const ok=document.execCommand('copy');field.remove();if(!ok)throw new Error('Copy unavailable');}copy.textContent='Скопировано ✓';setTimeout(()=>copy.textContent='Скопировать текст',1800);}catch{copy.textContent='Выделите текст вручную';setTimeout(()=>copy.textContent='Скопировать текст',2500);}});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)update();});window.addEventListener('focus',update);render();
+(function () {
+  'use strict';
+  const KEY = 'local-document-checklist-v1';
+  const $ = id => document.getElementById(id);
+  const warning = $('warning');
+  let items = [];
+  function error(message) { warning.hidden = false; warning.textContent = message; }
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(items));
+      if (localStorage.getItem(KEY) !== JSON.stringify(items)) throw new Error('Проверка записи не прошла');
+    } catch (e) { error('Не удалось сохранить данные в браузере: ' + e.message); }
+  }
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) throw new Error('Неверный формат сохранённых данных');
+      items = parsed.filter(x => x && typeof x.name === 'string' && typeof x.id === 'string').map(x => ({id:x.id,name:x.name,checked:!!x.checked}));
+    }
+    const test = '__dochelper_test__';
+    localStorage.setItem(test, 'ok');
+    if (localStorage.getItem(test) !== 'ok') throw new Error('Запись не подтверждена');
+    localStorage.removeItem(test);
+  } catch (e) { error('Не удалось загрузить или проверить хранилище: ' + e.message); }
+  function message() {
+    const d = new Date();
+    const date = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0');
+    const selected = items.filter(x=>x.checked).map(x=>x.name);
+    return date + ' / нет' + (selected.length ? ' ' + selected.join(', ') : '');
+  }
+  function render() {
+    const root = $('docs');
+    root.replaceChildren();
+    if (!items.length) { const p=document.createElement('p'); p.className='muted'; p.textContent='Пока нет документов. Добавьте первый выше.'; root.append(p); }
+    items.forEach(item => {
+      const row=document.createElement('div'); row.className='doc';
+      const label=document.createElement('label');
+      const checkbox=document.createElement('input'); checkbox.type='checkbox'; checkbox.checked=item.checked;
+      checkbox.addEventListener('change',()=>{item.checked=checkbox.checked;save();update();});
+      const text=document.createElement('span'); text.textContent=item.name;
+      label.append(checkbox,text);
+      const del=document.createElement('button'); del.type='button'; del.className='delete'; del.textContent='Удалить';
+      del.addEventListener('click',()=>{items=items.filter(x=>x.id!==item.id);save();render();});
+      row.append(label,del);root.append(row);
+    });
+    update();
+  }
+  function update() { $('count').textContent='Всего: '+items.length+' · Отмечено: '+items.filter(x=>x.checked).length; $('result').textContent=message(); }
+  $('form').addEventListener('submit',e=>{
+    e.preventDefault(); const name=$('name').value.trim(); if(!name)return;
+    items.push({id:String(Date.now())+'-'+Math.random().toString(36).slice(2),name,checked:false});
+    $('name').value='';save();render();$('name').focus();
+  });
+  $('copy').addEventListener('click',async()=>{
+    try { await navigator.clipboard.writeText(message()); $('copy').textContent='Скопировано ✓'; }
+    catch(e) { error('Не удалось скопировать текст автоматически. Выделите его вручную.'); }
+    setTimeout(()=>$('copy').textContent='Скопировать текст',1500);
+  });
+  window.addEventListener('focus',update);
+  render();
 })();
 </script></body></html>
