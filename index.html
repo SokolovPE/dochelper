@@ -23,7 +23,7 @@ button.small{font-size:13px;padding:7px 9px}button.icon-button{min-width:32px;pa
 .doc-label input{width:19px;height:19px;flex:none;accent-color:#2464d8}
 .doc-name{min-width:0}.row-actions{gap:4px;flex:none}
 .edit-row{flex:1;min-width:0}.edit-row input{width:100%;flex:1}
-.result{background:#f6f8fb;border:1px solid #e1e8f1;border-radius:9px;padding:16px;min-height:105px;overflow-wrap:anywhere;white-space:pre-wrap}
+.right-column{display:flex;flex-direction:column;gap:18px;min-width:0}.date-input{width:120px;letter-spacing:.04em}.date-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}.result{background:#f6f8fb;border:1px solid #e1e8f1;border-radius:9px;padding:16px;min-height:105px;overflow-wrap:anywhere;white-space:pre-wrap}
 .copy-controls{margin-top:15px}.toggle{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
 .toggle input{width:18px;height:18px;accent-color:#2464d8}
 .warning{color:#9c1525;background:#fff0f1;padding:12px;border-radius:8px;margin:12px 0}
@@ -47,6 +47,7 @@ button.small{font-size:13px;padding:7px 9px}button.icon-button{min-width:32px;pa
 <p id="count" class="muted"></p>
 <div id="docs"></div>
 </section>
+<div class="right-column">
 <section class="panel">
 <h2>Итоговое сообщение</h2>
 <div id="result" class="result" aria-live="polite"></div>
@@ -56,6 +57,18 @@ button.small{font-size:13px;padding:7px 9px}button.icon-button{min-width:32px;pa
 </div>
 <p id="feedback" class="muted" role="status" aria-live="polite"></p>
 </section>
+<section class="panel">
+<h2>Готовность к приему</h2>
+<div class="date-controls">
+<label for="ready-date">Дата начала:</label>
+<input id="ready-date" class="date-input" type="text" inputmode="numeric" maxlength="5" placeholder="дд.ММ" autocomplete="off" aria-describedby="ready-hint">
+</div>
+<p id="ready-hint" class="muted">Введите день и месяц, например 15.11.</p>
+<div id="ready-result" class="result" aria-live="polite"></div>
+<div class="copy-controls"><button type="button" id="copy-ready">Скопировать текст</button><label class="toggle"><input id="clear-ready-on-copy" type="checkbox">Очищать при копировании</label></div>
+<p id="ready-feedback" class="muted" role="status" aria-live="polite"></p>
+</section>
+</div>
 </div>
 </main>
 <script>
@@ -63,8 +76,10 @@ button.small{font-size:13px;padding:7px 9px}button.icon-button{min-width:32px;pa
 'use strict';
 const KEY='local-document-checklist-v1'; // Совместимо с первой версией
 const PREF_KEY='local-document-checklist-clear-on-copy-v1';
+const READY_KEY='local-document-checklist-ready-date-v1';
+const READY_CLEAR_KEY='local-document-checklist-ready-clear-on-copy-v1';
 const $=id=>document.getElementById(id);
-let items=[], clearOnCopy=false, storageAvailable=true;
+let items=[], clearOnCopy=false, storageAvailable=true, readyDate='', clearReadyOnCopy=false;
 let feedbackTimer;
 function warn(msg){$('warning').hidden=false;$('warning').textContent=msg;}
 function store(key,value){
@@ -84,6 +99,10 @@ function load(){
     }
     const pref=localStorage.getItem(PREF_KEY);
     if(pref!==null)clearOnCopy=JSON.parse(pref)===true;
+    const savedReady=localStorage.getItem(READY_KEY);
+    if(savedReady!==null){const parsedReady=JSON.parse(savedReady);if(typeof parsedReady==='string')readyDate=parsedReady;}
+    const savedClearReady=localStorage.getItem(READY_CLEAR_KEY);
+    if(savedClearReady!==null)clearReadyOnCopy=JSON.parse(savedClearReady)===true;
     const test='__dochelper_test__';
     localStorage.setItem(test,'ok');
     if(localStorage.getItem(test)!=='ok')throw Error('проверка записи не прошла');
@@ -92,14 +111,37 @@ function load(){
 }
 function save(){store(KEY,items);}
 function selected(){return items.filter(x=>x.checked);}
+function today(){
+  const d=new Date();return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');
+}
 function message(){
-  const d=new Date(),date=String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0');
+  const date=today();
   const names=selected().map(x=>x.name);
   return date+' / нет'+(names.length?' '+names.join(', '):'');
+}
+function validReadyDate(value){
+  if(!/^\d{2}\.\d{2}$/.test(value))return false;
+  const [day,month]=value.split('.').map(Number);
+  if(month<1||month>12||day<1)return false;
+  // 29 февраля допустимо: год не указан.
+  const maxDays=[31,29,31,30,31,30,31,31,30,31,30,31];
+  return day<=maxDays[month-1];
+}
+function readyMessage(){return today()+' / готов к приему с '+readyDate;}
+function updateReady(){
+  const valid=validReadyDate(readyDate);
+  $('ready-result').textContent=readyDate?readyMessage():'Введите дату, чтобы сформировать сообщение.';
+  $('copy-ready').disabled=!valid;
+  $('ready-hint').textContent=readyDate&&!valid?'Введите корректную дату в формате дд.ММ (например, 15.11).':'Введите день и месяц, например 15.11.';
+}
+function maskDate(raw){
+  const digits=raw.replace(/\D/g,'').slice(0,4);
+  return digits.length>2?digits.slice(0,2)+'.'+digits.slice(2):digits;
 }
 function update(){
   $('count').textContent='Всего: '+items.length+' · Отмечено: '+selected().length;
   $('result').textContent=message();
+  updateReady();
   $('select-all').disabled=!items.length||items.every(x=>x.checked);
   $('clear').disabled=!items.some(x=>x.checked);
 }
@@ -159,9 +201,9 @@ function move(index,delta){
   [items[index],items[next]]=[items[next],items[index]];
   save();render();
 }
-function showFeedback(text,ok){
+function showFeedback(text,ok,elementId='feedback'){
   clearTimeout(feedbackTimer);
-  const el=$('feedback');el.textContent=text;el.className=ok?'ok':'bad';
+  const el=$(elementId);el.textContent=text;el.className=ok?'ok':'bad';
   feedbackTimer=setTimeout(()=>{el.textContent='';el.className='muted';},2500);
 }
 async function copyText(text){
@@ -197,9 +239,27 @@ $('copy').addEventListener('click',async()=>{
     showFeedback('Не удалось скопировать. Выделите текст вручную.',false);
   }
 });
+$('ready-date').addEventListener('input',e=>{
+  const field=e.target;
+  readyDate=maskDate(field.value);
+  field.value=readyDate;
+  store(READY_KEY,readyDate);
+  updateReady();
+});
+$('clear-ready-on-copy').addEventListener('change',e=>{
+  clearReadyOnCopy=e.target.checked;store(READY_CLEAR_KEY,clearReadyOnCopy);
+});
+$('copy-ready').addEventListener('click',async()=>{
+  if(!validReadyDate(readyDate))return;
+  const ok=await copyText(readyMessage());
+  if(ok&&clearReadyOnCopy){
+    readyDate='';$('ready-date').value='';store(READY_KEY,readyDate);updateReady();
+  }
+  showFeedback(ok?(clearReadyOnCopy?'Скопировано. Дата очищена.':'Скопировано в буфер обмена.'):'Не удалось скопировать. Выделите текст вручную.',ok,'ready-feedback');
+});
 window.addEventListener('focus',update);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)update();});
-load();$('clear-on-copy').checked=clearOnCopy;render();
+load();$('clear-on-copy').checked=clearOnCopy;$('ready-date').value=readyDate;$('clear-ready-on-copy').checked=clearReadyOnCopy;render();
 })();
 </script>
 </body>
