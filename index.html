@@ -23,7 +23,7 @@ button.small{font-size:13px;padding:7px 9px}button.icon-button{min-width:32px;pa
 .doc-label input{width:19px;height:19px;flex:none;accent-color:#2464d8}
 .doc-name{min-width:0}.row-actions{gap:4px;flex:none}
 .edit-row{flex:1;min-width:0}.edit-row input{width:100%;flex:1}
-.right-column{display:flex;flex-direction:column;gap:18px;min-width:0}.date-input{width:120px;letter-spacing:.04em}.date-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}.result{background:#f6f8fb;border:1px solid #e1e8f1;border-radius:9px;padding:16px;min-height:105px;overflow-wrap:anywhere;white-space:pre-wrap}
+.right-column{display:flex;flex-direction:column;gap:18px;min-width:0}.date-input{width:56px;text-align:center;letter-spacing:.04em}.date-input[readonly]{background:#f1f5f9;color:#475569}.date-separator{font-weight:700}.date-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}.result{background:#f6f8fb;border:1px solid #e1e8f1;border-radius:9px;padding:16px;min-height:105px;overflow-wrap:anywhere;white-space:pre-wrap}
 .copy-controls{margin-top:15px}.toggle{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
 .toggle input{width:18px;height:18px;accent-color:#2464d8}
 .warning{color:#9c1525;background:#fff0f1;padding:12px;border-radius:8px;margin:12px 0}
@@ -43,6 +43,7 @@ button.small{font-size:13px;padding:7px 9px}button.icon-button{min-width:32px;pa
 <div class="actions">
 <button type="button" id="select-all" class="secondary small">Выделить все</button>
 <button type="button" id="clear" class="secondary small">Сбросить отметки</button>
+<button type="button" id="reset-documents" class="danger small" title="Вернуть исходные 21 документа">Сбросить список документов</button>
 </div>
 <p id="count" class="muted"></p>
 <div id="docs"></div>
@@ -60,13 +61,21 @@ button.small{font-size:13px;padding:7px 9px}button.icon-button{min-width:32px;pa
 <section class="panel">
 <h2>Готовность к приему</h2>
 <div class="date-controls">
-<label for="ready-date">Дата начала:</label>
-<input id="ready-date" class="date-input" type="text" inputmode="numeric" maxlength="5" placeholder="дд.ММ" autocomplete="off" aria-describedby="ready-hint">
+<label for="ready-day">Дата начала:</label>
+<input id="ready-day" class="date-input" type="text" inputmode="numeric" maxlength="2" placeholder="дд" autocomplete="off" aria-describedby="ready-hint" aria-label="День начала приема">
+<span class="date-separator">.</span>
+<input id="ready-month" class="date-input" type="text" readonly aria-label="Текущий месяц">
 </div>
-<p id="ready-hint" class="muted">Введите день и месяц, например 15.11.</p>
+<p id="ready-hint" class="muted">Введите день; месяц подставляется автоматически.</p>
 <div id="ready-result" class="result" aria-live="polite"></div>
 <div class="copy-controls"><button type="button" id="copy-ready">Скопировать текст</button><label class="toggle"><input id="clear-ready-on-copy" type="checkbox">Очищать при копировании</label></div>
 <p id="ready-feedback" class="muted" role="status" aria-live="polite"></p>
+</section>
+<section class="panel">
+<h2>Личные документы</h2>
+<div id="personal-result" class="result" aria-live="polite"></div>
+<div class="copy-controls"><button type="button" id="copy-personal">Скопировать текст</button></div>
+<p id="personal-feedback" class="muted" role="status" aria-live="polite"></p>
 </section>
 </div>
 </div>
@@ -126,7 +135,7 @@ function load(){
     const pref=localStorage.getItem(PREF_KEY);
     if(pref!==null)clearOnCopy=JSON.parse(pref)===true;
     const savedReady=localStorage.getItem(READY_KEY);
-    if(savedReady!==null){const parsedReady=JSON.parse(savedReady);if(typeof parsedReady==='string')readyDate=parsedReady;}
+    if(savedReady!==null){const parsedReady=JSON.parse(savedReady);if(typeof parsedReady==='string')readyDate=parsedReady.replace(/\D/g,'').slice(0,2);}
     const savedClearReady=localStorage.getItem(READY_CLEAR_KEY);
     if(savedClearReady!==null)clearReadyOnCopy=JSON.parse(savedClearReady)===true;
     const test='__dochelper_test__';
@@ -145,28 +154,25 @@ function message(){
   const names=selected().map(x=>x.name);
   return date+' / нет'+(names.length?' '+names.join(', '):'');
 }
-function validReadyDate(value){
-  if(!/^\d{2}\.\d{2}$/.test(value))return false;
-  const [day,month]=value.split('.').map(Number);
-  if(month<1||month>12||day<1)return false;
-  // 29 февраля допустимо: год не указан.
-  const maxDays=[31,29,31,30,31,30,31,31,30,31,30,31];
-  return day<=maxDays[month-1];
+function currentMonth(){return String(new Date().getMonth()+1).padStart(2,'0');}
+function validReadyDay(value){
+  if(!/^\d{2}$/.test(value))return false;
+  const day=Number(value),month=Number(currentMonth()),year=new Date().getFullYear();
+  return day>=1&&day<=new Date(year,month,0).getDate();
 }
-function readyMessage(){return today()+' / готов к приему с '+readyDate;}
+function readyMessage(){return today()+' / готов к приему с '+readyDate+'.'+currentMonth();}
+function personalMessage(){return today()+' / жду личные документы';}
 function updateReady(){
-  const valid=validReadyDate(readyDate);
-  $('ready-result').textContent=readyDate?readyMessage():'Введите дату, чтобы сформировать сообщение.';
+  $('ready-month').value=currentMonth();
+  const valid=validReadyDay(readyDate);
+  $('ready-result').textContent=readyDate?readyMessage():'Введите день, чтобы сформировать сообщение.';
   $('copy-ready').disabled=!valid;
-  $('ready-hint').textContent=readyDate&&!valid?'Введите корректную дату в формате дд.ММ (например, 15.11).':'Введите день и месяц, например 15.11.';
-}
-function maskDate(raw){
-  const digits=raw.replace(/\D/g,'').slice(0,4);
-  return digits.length>2?digits.slice(0,2)+'.'+digits.slice(2):digits;
+  $('ready-hint').textContent=readyDate&&!valid?'Введите корректный день текущего месяца.':'Введите день; месяц подставляется автоматически.';
 }
 function update(){
   $('count').textContent='Всего: '+items.length+' · Отмечено: '+selected().length;
   $('result').textContent=message();
+  $('personal-result').textContent=personalMessage();
   updateReady();
   $('select-all').disabled=!items.length||items.every(x=>x.checked);
   $('clear').disabled=!items.some(x=>x.checked);
@@ -253,6 +259,15 @@ $('select-all').addEventListener('click',()=>{
   items.forEach(x=>x.checked=true);save();render();
 });
 $('clear').addEventListener('click',clearChecks);
+$('reset-documents').addEventListener('click',()=>{
+  if(!window.confirm('Вернуть исходные 21 документа? Все добавленные документы и изменения названий и порядка будут удалены. Это действие нельзя отменить.'))return;
+  const defaults=DEFAULT_DOCUMENTS.map((name,index)=>({id:'default-'+index,name,checked:false}));
+  if(store(KEY,defaults)){
+    items=defaults;
+    render();
+    showFeedback('Список восстановлен: 21 документ по умолчанию.',true);
+  }
+});
 $('clear-on-copy').addEventListener('change',e=>{
   clearOnCopy=e.target.checked;store(PREF_KEY,clearOnCopy);
 });
@@ -265,10 +280,9 @@ $('copy').addEventListener('click',async()=>{
     showFeedback('Не удалось скопировать. Выделите текст вручную.',false);
   }
 });
-$('ready-date').addEventListener('input',e=>{
-  const field=e.target;
-  readyDate=maskDate(field.value);
-  field.value=readyDate;
+$('ready-day').addEventListener('input',e=>{
+  readyDate=e.target.value.replace(/\D/g,'').slice(0,2);
+  e.target.value=readyDate;
   store(READY_KEY,readyDate);
   updateReady();
 });
@@ -276,16 +290,20 @@ $('clear-ready-on-copy').addEventListener('change',e=>{
   clearReadyOnCopy=e.target.checked;store(READY_CLEAR_KEY,clearReadyOnCopy);
 });
 $('copy-ready').addEventListener('click',async()=>{
-  if(!validReadyDate(readyDate))return;
+  if(!validReadyDay(readyDate))return;
   const ok=await copyText(readyMessage());
   if(ok&&clearReadyOnCopy){
-    readyDate='';$('ready-date').value='';store(READY_KEY,readyDate);updateReady();
+    readyDate='';$('ready-day').value='';store(READY_KEY,readyDate);updateReady();
   }
   showFeedback(ok?(clearReadyOnCopy?'Скопировано. Дата очищена.':'Скопировано в буфер обмена.'):'Не удалось скопировать. Выделите текст вручную.',ok,'ready-feedback');
 });
+$('copy-personal').addEventListener('click',async()=>{
+  const ok=await copyText(personalMessage());
+  showFeedback(ok?'Скопировано в буфер обмена.':'Не удалось скопировать. Выделите текст вручную.',ok,'personal-feedback');
+});
 window.addEventListener('focus',update);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)update();});
-load();$('clear-on-copy').checked=clearOnCopy;$('ready-date').value=readyDate;$('clear-ready-on-copy').checked=clearReadyOnCopy;render();
+load();$('clear-on-copy').checked=clearOnCopy;$('ready-day').value=readyDate;$('clear-ready-on-copy').checked=clearReadyOnCopy;render();
 })();
 </script>
 </body>
