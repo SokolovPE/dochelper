@@ -78,6 +78,29 @@ const KEY='local-document-checklist-v1'; // Совместимо с первой
 const PREF_KEY='local-document-checklist-clear-on-copy-v1';
 const READY_KEY='local-document-checklist-ready-date-v1';
 const READY_CLEAR_KEY='local-document-checklist-ready-clear-on-copy-v1';
+const DEFAULT_DOCUMENTS=[
+  "тк",
+  "стд-сфр",
+  "сзи-илс",
+  "инн",
+  "снилс",
+  "заявления на оформление новой тк",
+  "заявления об отсутствии стажа",
+  "паспорта",
+  "прописки",
+  "вб",
+  "реквизитов",
+  "льготных документов",
+  "свидетельства об изменении фамилии",
+  "водительского удостоверения",
+  "нотариального перевода паспорта",
+  "регистрации",
+  "патента",
+  "чеков об оплате авансовых платежей",
+  "вида на жительство",
+  "разрешения на временное проживание",
+  "миграционной карты"
+];
 const $=id=>document.getElementById(id);
 let items=[], clearOnCopy=false, storageAvailable=true, readyDate='', clearReadyOnCopy=false;
 let feedbackTimer;
@@ -92,7 +115,10 @@ function store(key,value){
 function load(){
   try{
     const raw=localStorage.getItem(KEY);
-    if(raw!==null){
+    if(raw===null){
+      items=DEFAULT_DOCUMENTS.map((name,index)=>({id:'default-'+index,name,checked:false}));
+      store(KEY,items); // Заполняем только при первом запуске, не перезаписываем существующий список.
+    }else{
       const parsed=JSON.parse(raw);
       if(!Array.isArray(parsed))throw Error('неверный формат списка');
       items=parsed.filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string').map(x=>({id:x.id,name:x.name,checked:!!x.checked}));
