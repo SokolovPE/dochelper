@@ -43,7 +43,7 @@ button.small{font-size:13px;padding:7px 9px}button.icon-button{min-width:32px;pa
 <div class="actions">
 <button type="button" id="select-all" class="secondary small">Выделить все</button>
 <button type="button" id="clear" class="secondary small">Сбросить отметки</button>
-<button type="button" id="reset-documents" class="danger small" title="Вернуть исходные 21 документа">Сбросить список документов</button>
+<button type="button" id="reset-documents" class="danger small" title="Вернуть исходные 22 документа">Сбросить список документов</button>
 </div>
 <p id="count" class="muted"></p>
 <div id="docs"></div>
@@ -89,6 +89,7 @@ const READY_KEY='local-document-checklist-ready-date-v1';
 const READY_CLEAR_KEY='local-document-checklist-ready-clear-on-copy-v1';
 const DEFAULT_DOCUMENTS=[
   "тк",
+  "пустого разворота тк",
   "стд-сфр",
   "сзи-илс",
   "инн",
@@ -260,12 +261,12 @@ $('select-all').addEventListener('click',()=>{
 });
 $('clear').addEventListener('click',clearChecks);
 $('reset-documents').addEventListener('click',()=>{
-  if(!window.confirm('Вернуть исходные 21 документа? Все добавленные документы и изменения названий и порядка будут удалены. Это действие нельзя отменить.'))return;
+  if(!window.confirm('Вернуть исходные 22 документа? Все добавленные документы и изменения названий и порядка будут удалены. Это действие нельзя отменить.'))return;
   const defaults=DEFAULT_DOCUMENTS.map((name,index)=>({id:'default-'+index,name,checked:false}));
   if(store(KEY,defaults)){
     items=defaults;
     render();
-    showFeedback('Список восстановлен: 21 документ по умолчанию.',true);
+    showFeedback('Список восстановлен: 22 документа по умолчанию.',true);
   }
 });
 $('clear-on-copy').addEventListener('change',e=>{
